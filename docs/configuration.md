@@ -49,10 +49,10 @@ Standalone ElevenLabs APIs:
 - `ELEVENLABS_TTS_MODEL=eleven_flash_v2_5`
 - `ELEVENLABS_TTS_OUTPUT_FORMAT=ulaw_8000`
 - `ELEVENLABS_TTS_TIMEOUT_MS=30000`
-- `ELEVENLABS_TTS_STABILITY=0.45`
+- `ELEVENLABS_TTS_STABILITY=0.40`
 - `ELEVENLABS_TTS_SIMILARITY_BOOST=0.75`
-- `ELEVENLABS_TTS_STYLE=0.15`
-- `ELEVENLABS_TTS_SPEED=0.92`
+- `ELEVENLABS_TTS_STYLE=0.25`
+- `ELEVENLABS_TTS_SPEED=0.84`
 
 Scribe receives raw mono Twilio `ulaw_8000`. In `pcm_16000` benchmark mode, the provider converts that same telephone signal internally while the telephony layer remains unchanged. The runtime aggregates five typical 20 ms Twilio frames into a 100 ms Scribe chunk. Do not commit contract-test audio; use an anonymized local raw μ-law file and run `npm run verify:scribe -- <path> "reference transcript"`.
 

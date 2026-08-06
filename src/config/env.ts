@@ -36,10 +36,10 @@ const schema = z.object({
   ELEVENLABS_TTS_MODEL: z.string().default('eleven_flash_v2_5'),
   ELEVENLABS_TTS_OUTPUT_FORMAT: z.enum(['pcm_16000', 'ulaw_8000']).default('ulaw_8000'),
   ELEVENLABS_TTS_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60000).default(30000),
-  ELEVENLABS_TTS_STABILITY: z.coerce.number().min(0).max(1).default(0.45),
+  ELEVENLABS_TTS_STABILITY: z.coerce.number().min(0).max(1).default(0.4),
   ELEVENLABS_TTS_SIMILARITY_BOOST: z.coerce.number().min(0).max(1).default(0.75),
-  ELEVENLABS_TTS_STYLE: z.coerce.number().min(0).max(1).default(0.15),
-  ELEVENLABS_TTS_SPEED: z.coerce.number().min(0.7).max(1.2).default(0.92),
+  ELEVENLABS_TTS_STYLE: z.coerce.number().min(0).max(1).default(0.25),
+  ELEVENLABS_TTS_SPEED: z.coerce.number().min(0.7).max(1.2).default(0.84),
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_LLM_MODEL: z.string().default('gpt-4o-mini'),
 });
