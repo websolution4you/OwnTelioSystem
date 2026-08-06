@@ -38,7 +38,16 @@ Standalone ElevenLabs APIs:
 - `ELEVENLABS_API_KEY`
 - `ELEVENLABS_VOICE_ID`
 - `ELEVENLABS_STT_MODEL=scribe_v2_realtime`
+- `ELEVENLABS_STT_COMMIT_STRATEGY=vad`
+- `ELEVENLABS_STT_CHUNK_MS=100`
+- `ELEVENLABS_STT_VAD_SILENCE_SECONDS=1`
+- `ELEVENLABS_STT_VAD_THRESHOLD=0.4`
+- `ELEVENLABS_STT_MIN_SPEECH_MS=100`
+- `ELEVENLABS_STT_MIN_SILENCE_MS=100`
+- `ELEVENLABS_STT_SESSION_TIMEOUT_MS=10000`
 - `ELEVENLABS_TTS_MODEL=eleven_flash_v2_5`
+
+Scribe receives Twilio audio directly as raw mono `ulaw_8000`. The runtime aggregates five typical 20 ms Twilio frames into a 100 ms Scribe chunk. Do not commit contract-test audio; use an anonymized local raw μ-law file and run `npm run verify:scribe -- <path>`.
 
 LLM:
 

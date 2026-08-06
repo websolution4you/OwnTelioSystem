@@ -5,7 +5,6 @@ import { env } from '../config/env.js';
 import { createProviders } from '../providers/factory.js';
 import { callLogger } from '../shared/logger.js';
 import { TwilioMediaSocket } from '../telephony/TwilioMediaSocket.js';
-import { twilioToStt } from './audio/twilioAudio.js';
 import type { AudioFrame, SttSession } from './contracts.js';
 import { CallState } from './state/CallState.js';
 
@@ -75,11 +74,10 @@ export class VoiceCallSession {
           encoding: 'mulaw_8000' as const,
           sequence: Number(message.media.sequenceNumber ?? 0),
         };
-        const sttFrame = twilioToStt(frame);
         if (this.sttReady) {
-          this.stt?.send(sttFrame);
+          this.stt?.send(frame);
         } else {
-          this.pendingInboundFrames.push(sttFrame);
+          this.pendingInboundFrames.push(frame);
           if (this.pendingInboundFrames.length > 250) this.pendingInboundFrames.shift();
         }
       } else if (message.event === 'stop') {
