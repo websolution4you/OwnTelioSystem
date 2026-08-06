@@ -3,6 +3,7 @@ import { env } from '../../config/env.js';
 import { callLogger } from '../../shared/logger.js';
 import type { AudioFrame, SttProvider, SttSession } from '../../voice/contracts.js';
 import { AudioFrameAggregator } from '../../voice/audio/AudioFrameAggregator.js';
+import { twilioToStt } from '../../voice/audio/twilioAudio.js';
 
 export class ElevenLabsSttProvider implements SttProvider {
   createSession(options: Parameters<SttProvider['createSession']>[0]): SttSession {
@@ -29,7 +30,7 @@ const errorEventTypes = new Set([
 
 class ElevenLabsSttSession implements SttSession {
   private socket: WebSocket | null = null;
-  private readonly audio = new AudioFrameAggregator('mulaw_8000', env.ELEVENLABS_STT_CHUNK_MS);
+  private readonly audio = new AudioFrameAggregator(env.ELEVENLABS_STT_AUDIO_FORMAT === 'ulaw_8000' ? 'mulaw_8000' : 'pcm_s16le_16000', env.ELEVENLABS_STT_CHUNK_MS);
   private sessionStarted = false;
   private startResolve: (() => void) | null = null;
   private startReject: ((error: Error) => void) | null = null;
@@ -45,7 +46,7 @@ class ElevenLabsSttSession implements SttSession {
     const query = new URLSearchParams({
       model_id: env.ELEVENLABS_STT_MODEL,
       language_code: this.options.language,
-      audio_format: 'ulaw_8000',
+      audio_format: env.ELEVENLABS_STT_AUDIO_FORMAT,
       commit_strategy: env.ELEVENLABS_STT_COMMIT_STRATEGY,
     });
     if (env.ELEVENLABS_STT_COMMIT_STRATEGY === 'vad') {
@@ -74,7 +75,8 @@ class ElevenLabsSttSession implements SttSession {
 
   send(frame: AudioFrame): void {
     if (!this.sessionStarted || this.socket?.readyState !== WebSocket.OPEN) return;
-    for (const chunk of this.audio.push(frame)) this.sendChunk(chunk.data);
+    const providerFrame = env.ELEVENLABS_STT_AUDIO_FORMAT === 'pcm_16000' ? twilioToStt(frame) : frame;
+    for (const chunk of this.audio.push(providerFrame)) this.sendChunk(chunk.data);
   }
 
   commit(): void {

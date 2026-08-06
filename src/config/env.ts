@@ -25,6 +25,7 @@ const schema = z.object({
   ELEVENLABS_API_KEY: z.string().optional(),
   ELEVENLABS_VOICE_ID: z.string().optional(),
   ELEVENLABS_STT_MODEL: z.string().default('scribe_v2_realtime'),
+  ELEVENLABS_STT_AUDIO_FORMAT: z.enum(['ulaw_8000', 'pcm_16000']).default('ulaw_8000'),
   ELEVENLABS_STT_COMMIT_STRATEGY: z.enum(['vad', 'manual']).default('vad'),
   ELEVENLABS_STT_CHUNK_MS: z.coerce.number().int().min(100).max(1000).default(100),
   ELEVENLABS_STT_VAD_SILENCE_SECONDS: z.coerce.number().min(0.3).max(3).default(1),

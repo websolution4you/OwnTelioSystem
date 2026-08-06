@@ -2,8 +2,10 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { env } from '../config/env.js';
 import { ElevenLabsSttProvider } from '../providers/elevenlabs/ElevenLabsSttProvider.js';
+import { wordErrorRate } from '../metrics/wordErrorRate.js';
 
 const audioPath = process.argv[2];
+const reference = process.argv.slice(3).join(' ').trim();
 if (!audioPath) {
   throw new Error('Usage: npm run verify:scribe -- <path-to-raw-ulaw-8000-file>');
 }
@@ -75,6 +77,11 @@ try {
   process.stdout.write(`FIRST_PARTIAL_FROM_AUDIO_START_MS: ${firstPartialAt ? Math.round(firstPartialAt - audioStartedAt) : 'none'}\n`);
   process.stdout.write(`COMMITTED_FROM_AUDIO_END_MS: ${Math.round(committedAt - audioEndedAt)}\n`);
   process.stdout.write(`FINAL_TEXT: ${committedText}\n`);
+  if (reference) {
+    const wer = wordErrorRate(reference, committedText);
+    process.stdout.write(`WER_PERCENT: ${(wer.rate * 100).toFixed(2)}\n`);
+    process.stdout.write(`WER_COUNTS: substitutions=${wer.substitutions},insertions=${wer.insertions},deletions=${wer.deletions},referenceWords=${wer.referenceWords}\n`);
+  }
 } finally {
   await session.close();
 }
