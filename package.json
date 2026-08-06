@@ -12,7 +12,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "verify:scribe": "tsx src/scripts/verifyElevenLabsScribe.ts"
+    "verify:scribe": "tsx src/scripts/verifyElevenLabsScribe.ts",
+    "verify:tts": "tsx src/scripts/verifyElevenLabsTts.ts"
   },
   "dependencies": {
     "@fastify/formbody": "^8.0.2",

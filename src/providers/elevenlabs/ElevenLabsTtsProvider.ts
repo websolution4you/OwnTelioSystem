@@ -14,42 +14,78 @@ export class ElevenLabsTtsProvider implements TtsProvider {
     });
     const socket = new WebSocket(
       `wss://api.elevenlabs.io/v1/text-to-speech/${env.ELEVENLABS_VOICE_ID}/stream-input?${query}`,
-      { headers: { 'xi-api-key': env.ELEVENLABS_API_KEY } },
     );
 
     await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('ElevenLabs TTS timeout')), 30_000);
-      const abort = () => socket.close(1000, 'barge-in');
+      let settled = false;
+      const finish = (error?: Error) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        options.signal.removeEventListener('abort', abort);
+        if (error) reject(error);
+        else resolve();
+      };
+      const timeout = setTimeout(() => {
+        socket.close(1000, 'timeout');
+        finish(new Error('ELEVENLABS_TTS_TIMEOUT'));
+      }, env.ELEVENLABS_TTS_TIMEOUT_MS);
+      const abort = () => {
+        socket.close(1000, 'barge-in');
+        finish();
+      };
       options.signal.addEventListener('abort', abort, { once: true });
 
       socket.on('open', () => {
         socket.send(JSON.stringify({
           text: ' ',
-          voice_settings: { stability: 0.5, similarity_boost: 0.75, use_speaker_boost: true },
+          voice_settings: {
+            stability: env.ELEVENLABS_TTS_STABILITY,
+            similarity_boost: env.ELEVENLABS_TTS_SIMILARITY_BOOST,
+            use_speaker_boost: true,
+            speed: env.ELEVENLABS_TTS_SPEED,
+          },
           generation_config: { chunk_length_schedule: [80, 120, 180, 250] },
+          xi_api_key: env.ELEVENLABS_API_KEY,
         }));
-        socket.send(JSON.stringify({ text: options.text, try_trigger_generation: true }));
+        socket.send(JSON.stringify({ text: options.text, flush: true }));
         socket.send(JSON.stringify({ text: '' }));
       });
       socket.on('message', (data) => {
-        const message = JSON.parse(data.toString()) as { audio?: string; isFinal?: boolean };
-        if (message.audio && !options.signal.aborted) {
-          const frame: AudioFrame = {
-            data: Buffer.from(message.audio, 'base64'),
-            encoding: 'pcm_s16le_16000',
+        try {
+          const message = JSON.parse(data.toString()) as {
+            audio?: string;
+            isFinal?: boolean;
+            error?: string;
+            message?: string;
+            detail?: string | { message?: string };
           };
-          options.onAudio(frame);
+          if (message.error || message.detail) {
+            const detail = typeof message.detail === 'object' ? message.detail.message : message.detail;
+            finish(new Error(`ELEVENLABS_TTS_ERROR: ${message.error ?? detail ?? message.message ?? 'unknown'}`));
+            socket.close(1000, 'provider error');
+            return;
+          }
+          if (message.audio && !options.signal.aborted) {
+            const frame: AudioFrame = {
+              data: Buffer.from(message.audio, 'base64'),
+              encoding: 'pcm_s16le_16000',
+            };
+            options.onAudio(frame);
+          }
+          if (message.isFinal) {
+            finish();
+            socket.close(1000, 'complete');
+          }
+        } catch {
+          finish(new Error('ELEVENLABS_TTS_INVALID_MESSAGE'));
+          socket.close(1000, 'invalid message');
         }
-        if (message.isFinal) socket.close(1000, 'complete');
       });
-      socket.once('error', (error) => {
-        clearTimeout(timeout);
-        reject(error);
-      });
-      socket.once('close', () => {
-        clearTimeout(timeout);
-        options.signal.removeEventListener('abort', abort);
-        resolve();
+      socket.once('error', (error) => finish(error));
+      socket.once('close', (code, reason) => {
+        if (code === 1000 || options.signal.aborted) finish();
+        else finish(new Error(`ELEVENLABS_TTS_SOCKET_CLOSED: ${code} ${reason.toString()}`.trim()));
       });
     });
   }
