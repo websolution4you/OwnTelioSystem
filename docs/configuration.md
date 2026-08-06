@@ -47,14 +47,16 @@ Standalone ElevenLabs APIs:
 - `ELEVENLABS_STT_MIN_SILENCE_MS=100`
 - `ELEVENLABS_STT_SESSION_TIMEOUT_MS=10000`
 - `ELEVENLABS_TTS_MODEL=eleven_flash_v2_5`
+- `ELEVENLABS_TTS_OUTPUT_FORMAT=ulaw_8000`
 - `ELEVENLABS_TTS_TIMEOUT_MS=30000`
-- `ELEVENLABS_TTS_STABILITY=0.5`
+- `ELEVENLABS_TTS_STABILITY=0.45`
 - `ELEVENLABS_TTS_SIMILARITY_BOOST=0.75`
-- `ELEVENLABS_TTS_SPEED=1`
+- `ELEVENLABS_TTS_STYLE=0.15`
+- `ELEVENLABS_TTS_SPEED=0.92`
 
 Scribe receives raw mono Twilio `ulaw_8000`. In `pcm_16000` benchmark mode, the provider converts that same telephone signal internally while the telephony layer remains unchanged. The runtime aggregates five typical 20 ms Twilio frames into a 100 ms Scribe chunk. Do not commit contract-test audio; use an anonymized local raw μ-law file and run `npm run verify:scribe -- <path> "reference transcript"`.
 
-Standalone TTS can be tested without Twilio by running `npm run verify:tts -- "Dobrý deň, ako vám môžem pomôcť?"`. It writes a PCM 16 kHz WAV and a telephone μ-law 8 kHz WAV to the operating-system temporary directory for listening tests.
+Standalone TTS can be tested without Twilio by running `npm run verify:tts -- "Dobrý deň, ako vám môžem pomôcť?"`. It writes a WAV matching the configured output to the operating-system temporary directory. The production default asks ElevenLabs for native `ulaw_8000`, which Twilio can play without local resampling or transcoding. `pcm_16000` remains available for high-quality listening comparisons.
 
 LLM:
 

@@ -9,7 +9,7 @@ export class ElevenLabsTtsProvider implements TtsProvider {
     }
     const query = new URLSearchParams({
       model_id: env.ELEVENLABS_TTS_MODEL,
-      output_format: 'pcm_16000',
+      output_format: env.ELEVENLABS_TTS_OUTPUT_FORMAT,
       optimize_streaming_latency: '3',
     });
     const socket = new WebSocket(
@@ -43,6 +43,7 @@ export class ElevenLabsTtsProvider implements TtsProvider {
             stability: env.ELEVENLABS_TTS_STABILITY,
             similarity_boost: env.ELEVENLABS_TTS_SIMILARITY_BOOST,
             use_speaker_boost: true,
+            style: env.ELEVENLABS_TTS_STYLE,
             speed: env.ELEVENLABS_TTS_SPEED,
           },
           generation_config: { chunk_length_schedule: [80, 120, 180, 250] },
@@ -69,7 +70,7 @@ export class ElevenLabsTtsProvider implements TtsProvider {
           if (message.audio && !options.signal.aborted) {
             const frame: AudioFrame = {
               data: Buffer.from(message.audio, 'base64'),
-              encoding: 'pcm_s16le_16000',
+              encoding: env.ELEVENLABS_TTS_OUTPUT_FORMAT === 'ulaw_8000' ? 'mulaw_8000' : 'pcm_s16le_16000',
             };
             options.onAudio(frame);
           }
