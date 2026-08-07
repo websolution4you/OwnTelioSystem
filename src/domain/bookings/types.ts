@@ -36,5 +36,4 @@ export interface CreateBookingInput {
   startAt: Date;
   endAt: Date;
   idempotencyKey: string;
-  userId?: string;
 }

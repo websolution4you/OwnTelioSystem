@@ -1,11 +1,9 @@
-import type { PoolClient } from 'pg';
 import { requirePool } from '../../db/pool.js';
 import type { Booking, CreateBookingInput, Sport } from './types.js';
 import { sportCourtIds } from './types.js';
 
 interface CourtOccupancyRow {
   court_id: string | null;
-  notes: string | Record<string, unknown> | null;
 }
 
 interface BookingRow {
@@ -32,10 +30,6 @@ function metadata(row: { notes: string | Record<string, unknown> | null }): Reco
   }
 }
 
-function courtId(row: CourtOccupancyRow): string {
-  return row.court_id ?? String(metadata(row).courtId ?? '');
-}
-
 function toBooking(row: BookingRow): Booking {
   const notes = metadata(row);
   return {
@@ -57,100 +51,37 @@ function toBooking(row: BookingRow): Booking {
 export class BookingRepository {
   async findFreeCourts(tenantId: string, sport: Sport, startAt: Date, endAt: Date): Promise<string[]> {
     const result = await requirePool().query<CourtOccupancyRow>(
-      `SELECT court_id, notes
-         FROM bookings
-        WHERE tenant_id = $1
-          AND status = ANY(ARRAY['confirmed', 'pending', 'blocked'])
-          AND start_at < $3
-          AND end_at > $2`,
+      'SELECT court_id FROM telio_voice.occupied_courts($1, $2, $3)',
       [tenantId, startAt.toISOString(), endAt.toISOString()],
     );
-    const busy = new Set(result.rows.map(courtId));
+    const busy = new Set(result.rows.map((row) => row.court_id).filter((id): id is string => id !== null));
     return [...sportCourtIds[sport]].filter((courtId) => !busy.has(courtId));
   }
 
   async create(input: CreateBookingInput): Promise<Booking> {
-    const notes = JSON.stringify({
-      courtId: input.courtId,
-      source: 'own-telio-voice-assistant',
-      notes: 'Rezervácia vytvorená hlasovým asistentom Telio',
-      idempotencyKey: input.idempotencyKey,
-    });
-    const client = await requirePool().connect();
-    try {
-      await client.query('BEGIN');
-      await this.lockCourt(client, input.tenantId, input.courtId);
-
-      const duplicate = await client.query<BookingRow>(
-        `SELECT id, tenant_id, user_id, customer_name, customer_phone, sport, court_id,
-                start_at, end_at, status, notes
-           FROM bookings
-          WHERE tenant_id = $1
-            AND notes = $2
-          LIMIT 1`,
-        [input.tenantId, notes],
-      );
-      const existing = duplicate.rows[0];
-      if (existing) {
-        await client.query('COMMIT');
-        return toBooking(existing);
-      }
-
-      const conflicts = await client.query<CourtOccupancyRow>(
-        `SELECT court_id, notes
-           FROM bookings
-          WHERE tenant_id = $1
-            AND status = ANY(ARRAY['confirmed', 'pending', 'blocked'])
-            AND start_at < $3
-            AND end_at > $2`,
-        [input.tenantId, input.startAt.toISOString(), input.endAt.toISOString()],
-      );
-      if (conflicts.rows.some((row) => courtId(row) === input.courtId)) {
-        throw new Error('BOOKING_CONFLICT');
-      }
-
-      const inserted = await client.query<BookingRow>(
-        `INSERT INTO bookings
-          (tenant_id, user_id, customer_name, customer_phone, sport, court_id, start_at, end_at, status, notes)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'confirmed', $9)
-         RETURNING id, tenant_id, user_id, customer_name, customer_phone, sport, court_id,
-                   start_at, end_at, status, notes`,
-        [
-          input.tenantId,
-          input.userId ?? null,
-          input.customerName,
-          input.customerPhone,
-          input.sport,
-          input.courtId,
-          input.startAt.toISOString(),
-          input.endAt.toISOString(),
-          notes,
-        ],
-      );
-      await client.query('COMMIT');
-      return toBooking(inserted.rows[0]!);
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
+    const result = await requirePool().query<BookingRow>(
+      `SELECT * FROM telio_voice.create_booking($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        input.tenantId,
+        input.customerName,
+        input.customerPhone,
+        input.sport,
+        input.courtId,
+        input.startAt.toISOString(),
+        input.endAt.toISOString(),
+        input.idempotencyKey,
+      ],
+    );
+    const booking = result.rows[0];
+    if (!booking) throw new Error('BOOKING_CREATE_EMPTY_RESULT');
+    return toBooking(booking);
   }
 
   async findUpcomingByPhone(tenantId: string, phone: string): Promise<Booking[]> {
     const result = await requirePool().query<BookingRow>(
-      `SELECT id, tenant_id, user_id, customer_name, customer_phone, sport, court_id,
-              start_at, end_at, status, notes
-         FROM bookings
-        WHERE tenant_id = $1 AND customer_phone = $2
-          AND status = 'confirmed' AND start_at > NOW()
-        ORDER BY start_at ASC LIMIT 10`,
+      'SELECT * FROM telio_voice.find_upcoming_bookings($1, $2)',
       [tenantId, phone],
     );
     return result.rows.map(toBooking);
-  }
-
-  private async lockCourt(client: PoolClient, tenantId: string, courtId: string): Promise<void> {
-    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`${tenantId}:${courtId}`]);
   }
 }
