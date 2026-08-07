@@ -1,4 +1,4 @@
--- REVIEW ONLY. Do not run yet.
+-- Approved read-only deployment after successful transactional dry-run.
 -- Tenant-scoped availability API for Own Telio. Returns court IDs only; no customer data.
 BEGIN;
 
@@ -20,10 +20,11 @@ CREATE ROLE own_telio_runtime NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPL
 CREATE SCHEMA telio_voice AUTHORIZATION postgres;
 REVOKE ALL ON SCHEMA telio_voice FROM PUBLIC;
 
+REVOKE CREATE ON SCHEMA public FROM own_telio_runtime;
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM own_telio_runtime;
 REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM own_telio_runtime;
 
-CREATE OR REPLACE FUNCTION telio_voice.occupied_courts(
+CREATE FUNCTION telio_voice.occupied_courts(
   p_tenant_id uuid,
   p_start_at timestamptz,
   p_end_at timestamptz

@@ -40,7 +40,10 @@ describe('least-privilege booking database boundary', () => {
     expect(sql.match(/SET search_path = pg_catalog/g)).toHaveLength(2);
     expect(sql.match(/REVOKE ALL ON FUNCTION[\s\S]*?FROM PUBLIC;/g)).toHaveLength(2);
     expect(readApi).toContain('CREATE ROLE own_telio_runtime NOLOGIN');
+    expect(readApi).toContain('REVOKE CREATE ON SCHEMA public FROM own_telio_runtime');
     expect(readApi).toContain('REVOKE ALL ON ALL TABLES IN SCHEMA public FROM own_telio_runtime');
+    expect(readApi).toContain('CREATE FUNCTION telio_voice.occupied_courts');
+    expect(readApi).not.toContain('CREATE OR REPLACE FUNCTION');
     expect(sql).not.toMatch(/CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+[^\s(]*(?:find|list|cancel|delete|update|restore)/i);
     const returnSignatures = sql.match(/RETURNS TABLE\([\s\S]*?\)/g) ?? [];
     expect(returnSignatures).toHaveLength(2);
