@@ -1,18 +1,19 @@
 import type { PoolClient } from 'pg';
 import { requirePool } from '../../db/pool.js';
 import type { Booking, CreateBookingInput, Sport } from './types.js';
-import { sportCourtCounts } from './types.js';
+import { sportCourtIds } from './types.js';
 
 interface BookingRow {
   id: string;
   tenant_id: string;
   user_id: string | null;
-  customer_name: string;
+  customer_name: string | null;
   customer_phone: string | null;
+  sport: Sport | null;
   court_id: string | null;
   start_at: string;
   end_at: string;
-  status: 'confirmed' | 'blocked' | 'cancelled';
+  status: 'confirmed' | 'pending' | 'blocked' | 'cancelled';
   notes: string | Record<string, unknown> | null;
 }
 
@@ -32,47 +33,54 @@ function toBooking(row: BookingRow): Booking {
     id: row.id,
     tenantId: row.tenant_id,
     userId: row.user_id,
-    customerName: row.customer_name,
+    customerName: row.customer_name ?? '',
     customerPhone: row.customer_phone,
     courtId: row.court_id ?? String(notes.courtId ?? ''),
     startAt: row.start_at,
     endAt: row.end_at,
     status: row.status,
-    source: notes.source === 'admin' || notes.source === 'web' ? notes.source : 'voice-assistant',
+    source: notes.source === 'admin' || notes.source === 'web' || notes.source === 'own-telio-voice-assistant'
+      ? notes.source
+      : 'voice-assistant',
   };
 }
 
 export class BookingRepository {
   async findFreeCourts(tenantId: string, sport: Sport, startAt: Date, endAt: Date): Promise<string[]> {
     const result = await requirePool().query<BookingRow>(
-      `SELECT id, tenant_id, user_id, customer_name, customer_phone, court_id,
+      `SELECT id, tenant_id, user_id, customer_name, customer_phone, sport, court_id,
               start_at, end_at, status, notes
          FROM bookings
         WHERE tenant_id = $1
-          AND status <> 'cancelled'
+          AND status = ANY(ARRAY['confirmed', 'pending', 'blocked'])
           AND start_at < $3
           AND end_at > $2`,
       [tenantId, startAt.toISOString(), endAt.toISOString()],
     );
     const busy = new Set(result.rows.map((row) => toBooking(row).courtId));
-    return Array.from({ length: sportCourtCounts[sport] }, (_, index) => `${sport}-${index + 1}`)
-      .filter((courtId) => !busy.has(courtId));
+    return [...sportCourtIds[sport]].filter((courtId) => !busy.has(courtId));
   }
 
   async create(input: CreateBookingInput): Promise<Booking> {
+    const notes = JSON.stringify({
+      courtId: input.courtId,
+      source: 'own-telio-voice-assistant',
+      notes: 'Rezervácia vytvorená hlasovým asistentom Telio',
+      idempotencyKey: input.idempotencyKey,
+    });
     const client = await requirePool().connect();
     try {
       await client.query('BEGIN');
       await this.lockCourt(client, input.tenantId, input.courtId);
 
       const duplicate = await client.query<BookingRow>(
-        `SELECT id, tenant_id, user_id, customer_name, customer_phone, court_id,
+        `SELECT id, tenant_id, user_id, customer_name, customer_phone, sport, court_id,
                 start_at, end_at, status, notes
            FROM bookings
           WHERE tenant_id = $1
-            AND notes::jsonb ->> 'idempotencyKey' = $2
+            AND notes = $2
           LIMIT 1`,
-        [input.tenantId, input.idempotencyKey],
+        [input.tenantId, notes],
       );
       const existing = duplicate.rows[0];
       if (existing) {
@@ -80,35 +88,32 @@ export class BookingRepository {
         return toBooking(existing);
       }
 
-      const conflict = await client.query(
-        `SELECT 1 FROM bookings
+      const conflicts = await client.query<BookingRow>(
+        `SELECT id, tenant_id, user_id, customer_name, customer_phone, sport, court_id,
+                start_at, end_at, status, notes
+           FROM bookings
           WHERE tenant_id = $1
-            AND COALESCE(court_id, notes::jsonb ->> 'courtId') = $2
-            AND status <> 'cancelled'
-            AND start_at < $4
-            AND end_at > $3
-          LIMIT 1`,
-        [input.tenantId, input.courtId, input.startAt.toISOString(), input.endAt.toISOString()],
+            AND status = ANY(ARRAY['confirmed', 'pending', 'blocked'])
+            AND start_at < $3
+            AND end_at > $2`,
+        [input.tenantId, input.startAt.toISOString(), input.endAt.toISOString()],
       );
-      if (conflict.rowCount) throw new Error('BOOKING_CONFLICT');
+      if (conflicts.rows.some((row) => toBooking(row).courtId === input.courtId)) {
+        throw new Error('BOOKING_CONFLICT');
+      }
 
-      const notes = JSON.stringify({
-        courtId: input.courtId,
-        source: 'voice-assistant',
-        notes: 'Rezervácia vytvorená hlasovým asistentom Telio',
-        idempotencyKey: input.idempotencyKey,
-      });
       const inserted = await client.query<BookingRow>(
         `INSERT INTO bookings
-          (tenant_id, user_id, customer_name, customer_phone, court_id, start_at, end_at, status, notes)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'confirmed', $8)
-         RETURNING id, tenant_id, user_id, customer_name, customer_phone, court_id,
+          (tenant_id, user_id, customer_name, customer_phone, sport, court_id, start_at, end_at, status, notes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'confirmed', $9)
+         RETURNING id, tenant_id, user_id, customer_name, customer_phone, sport, court_id,
                    start_at, end_at, status, notes`,
         [
           input.tenantId,
           input.userId ?? null,
           input.customerName,
           input.customerPhone,
+          input.sport,
           input.courtId,
           input.startAt.toISOString(),
           input.endAt.toISOString(),
@@ -127,7 +132,7 @@ export class BookingRepository {
 
   async findUpcomingByPhone(tenantId: string, phone: string): Promise<Booking[]> {
     const result = await requirePool().query<BookingRow>(
-      `SELECT id, tenant_id, user_id, customer_name, customer_phone, court_id,
+      `SELECT id, tenant_id, user_id, customer_name, customer_phone, sport, court_id,
               start_at, end_at, status, notes
          FROM bookings
         WHERE tenant_id = $1 AND customer_phone = $2

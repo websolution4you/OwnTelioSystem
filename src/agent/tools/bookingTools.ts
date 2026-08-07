@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { env } from '../../config/env.js';
 import { BookingRepository } from '../../domain/bookings/BookingRepository.js';
-import { sportCourtCounts, type Sport } from '../../domain/bookings/types.js';
+import { sportCourtCounts, sportCourtIds, type Sport } from '../../domain/bookings/types.js';
 import type { ToolDefinition } from '../../voice/contracts.js';
 
 const sportSchema = z.enum(['badminton', 'tennis', 'squash', 'tennis-clay']);
@@ -78,13 +78,16 @@ export class BookingToolExecutor {
     if (name === 'create_booking') {
       if (!env.BOOKING_WRITES_ENABLED) throw new Error('BOOKING_WRITES_DISABLED');
       const input = createSchema.parse(rawInput);
-      if (!input.courtId.startsWith(`${input.sport}-`)) throw new Error('COURT_SPORT_MISMATCH');
+      if (!(sportCourtIds[input.sport] as readonly string[]).includes(input.courtId)) {
+        throw new Error('COURT_SPORT_MISMATCH');
+      }
       const start = new Date(input.startAt);
       const end = new Date(start.getTime() + input.durationMinutes * 60_000);
       const booking = await this.repository.create({
         tenantId,
         customerName: input.customerName,
         customerPhone: input.customerPhone,
+        sport: input.sport,
         courtId: input.courtId,
         startAt: start,
         endAt: end,
