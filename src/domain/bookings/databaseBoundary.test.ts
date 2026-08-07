@@ -10,6 +10,18 @@ const createApi = readFileSync(
   new URL('../../../proposals/003b_restricted_booking_create_api.sql', import.meta.url),
   'utf8',
 );
+const verifyReadApi = readFileSync(
+  new URL('../../../proposals/006_verify_restricted_booking_read_api.sql', import.meta.url),
+  'utf8',
+);
+const rollbackReadApi = readFileSync(
+  new URL('../../../proposals/007_rollback_restricted_booking_read_api.sql', import.meta.url),
+  'utf8',
+);
+const dryRunReadApi = readFileSync(
+  new URL('../../../proposals/008_dry_run_restricted_booking_read_api.sql', import.meta.url),
+  'utf8',
+);
 
 describe('least-privilege booking database boundary', () => {
   it('allows the repository to call only the restricted booking API', () => {
@@ -33,6 +45,19 @@ describe('least-privilege booking database boundary', () => {
     const returnSignatures = sql.match(/RETURNS TABLE\([\s\S]*?\)/g) ?? [];
     expect(returnSignatures).toHaveLength(2);
     expect(returnSignatures.join('\n')).not.toMatch(/\b(?:user_id|notes)\b/);
+  });
+
+  it('fails closed and provides a non-persistent read-only deployment rehearsal', () => {
+    expect(readApi).toContain("current_user <> 'postgres'");
+    expect(readApi).toContain('telio_voice schema already exists');
+    expect(readApi).toContain('own_telio_runtime role already exists');
+    expect(dryRunReadApi).toContain('ROLLBACK;');
+    expect(dryRunReadApi).not.toContain('COMMIT;');
+    expect(dryRunReadApi).toContain('schema_still_exists');
+    expect(dryRunReadApi).toContain('role_still_exists');
+    expect(verifyReadApi).toContain('BEGIN TRANSACTION READ ONLY;');
+    expect(rollbackReadApi).not.toMatch(/\bCASCADE\b/);
+    expect(`${readApi}\n${dryRunReadApi}`).not.toMatch(/(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+public\.bookings/i);
   });
 
   it('pins the production tenant and exact court inventory', () => {
