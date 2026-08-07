@@ -19,9 +19,12 @@ Create a local `.env` file. Never commit it.
 
 ## Telio database
 
-- `DATABASE_URL`: server-only Postgres connection string
+- `DATABASE_URL`: server-only Postgres connection string for a dedicated least-privilege runtime role; never use the database owner or Supabase `service_role`
+- `BOOKING_WRITES_ENABLED=false`: independent write kill switch; keep disabled through schema and read-path verification
 - `TELIO_TENANT_ID`: tenant UUID used by the Telio booking calendar
 - `TELIO_TIME_ZONE=Europe/Bratislava`
+
+The assistant can read booking availability, find upcoming bookings and insert a new confirmed booking after explicit confirmation. It has no cancel, delete, restore or update tool. Run `npm run audit:db-schema` before enabling writes; the command forces a read-only transaction and inspects metadata and privileges without reading booking rows. Do not apply draft migrations to the shared production database.
 
 ## Providers
 

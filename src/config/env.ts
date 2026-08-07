@@ -17,6 +17,7 @@ const schema = z.object({
   TWILIO_PHONE_NUMBER: z.string().optional(),
   TWILIO_VALIDATE_SIGNATURES: booleanFromString.default('true'),
   DATABASE_URL: z.string().optional(),
+  BOOKING_WRITES_ENABLED: booleanFromString.default('false'),
   TELIO_TENANT_ID: z.string().uuid().optional(),
   TELIO_TIME_ZONE: z.string().default('Europe/Bratislava'),
   STT_PROVIDER: z.enum(['mock', 'elevenlabs']).default('mock'),

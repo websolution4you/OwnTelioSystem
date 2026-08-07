@@ -17,7 +17,6 @@ const createSchema = intervalSchema.extend({
   idempotencyKey: z.string().min(8).max(200),
 });
 const phoneSchema = z.object({ customerPhone: z.string().min(7).max(30) });
-const cancelSchema = phoneSchema.extend({ bookingId: z.string().uuid() });
 
 export const bookingToolDefinitions: ToolDefinition[] = [
   {
@@ -60,15 +59,6 @@ export const bookingToolDefinitions: ToolDefinition[] = [
       required: ['customerPhone'], additionalProperties: false,
     },
   },
-  {
-    name: 'cancel_booking',
-    description: 'Cancel one booking selected and confirmed by the caller.',
-    inputSchema: {
-      type: 'object',
-      properties: { bookingId: { type: 'string', format: 'uuid' }, customerPhone: { type: 'string' } },
-      required: ['bookingId', 'customerPhone'], additionalProperties: false,
-    },
-  },
 ];
 
 export class BookingToolExecutor {
@@ -86,6 +76,7 @@ export class BookingToolExecutor {
       return { available: freeCourts.length > 0, freeCourts };
     }
     if (name === 'create_booking') {
+      if (!env.BOOKING_WRITES_ENABLED) throw new Error('BOOKING_WRITES_DISABLED');
       const input = createSchema.parse(rawInput);
       if (!input.courtId.startsWith(`${input.sport}-`)) throw new Error('COURT_SPORT_MISMATCH');
       const start = new Date(input.startAt);
@@ -104,10 +95,6 @@ export class BookingToolExecutor {
     if (name === 'find_upcoming_bookings') {
       const input = phoneSchema.parse(rawInput);
       return { bookings: await this.repository.findUpcomingByPhone(tenantId, input.customerPhone) };
-    }
-    if (name === 'cancel_booking') {
-      const input = cancelSchema.parse(rawInput);
-      return { cancelled: await this.repository.cancel(tenantId, input.bookingId, input.customerPhone) };
     }
     throw new Error(`Unknown tool: ${name}`);
   }

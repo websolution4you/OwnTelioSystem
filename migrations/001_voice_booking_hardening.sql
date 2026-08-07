@@ -1,5 +1,6 @@
--- Review before applying to the shared Telio database.
--- This migration is intentionally not executed by the application automatically.
+-- DO NOT APPLY TO THE SHARED PRODUCTION DATABASE.
+-- This historical draft predates the verified production schema, where court_id already exists.
+-- It is retained only for review and is never executed by the application automatically.
 
 ALTER TABLE bookings
   ADD COLUMN IF NOT EXISTS court_id text;

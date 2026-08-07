@@ -14,7 +14,8 @@
     "test:watch": "vitest",
     "verify:scribe": "tsx src/scripts/verifyElevenLabsScribe.ts",
     "verify:tts": "tsx src/scripts/verifyElevenLabsTts.ts",
-    "verify:tts-barge-in": "tsx src/scripts/verifyTtsBargeIn.ts"
+    "verify:tts-barge-in": "tsx src/scripts/verifyTtsBargeIn.ts",
+    "audit:db-schema": "tsx src/scripts/auditProductionSchema.ts"
   },
   "dependencies": {
     "@fastify/formbody": "^8.0.2",

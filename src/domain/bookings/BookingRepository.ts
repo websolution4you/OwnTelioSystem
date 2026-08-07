@@ -138,16 +138,6 @@ export class BookingRepository {
     return result.rows.map(toBooking);
   }
 
-  async cancel(tenantId: string, bookingId: string, phone: string): Promise<boolean> {
-    const result = await requirePool().query(
-      `UPDATE bookings SET status = 'cancelled'
-        WHERE id = $1 AND tenant_id = $2 AND customer_phone = $3
-          AND status = 'confirmed' AND start_at > NOW()`,
-      [bookingId, tenantId, phone],
-    );
-    return (result.rowCount ?? 0) > 0;
-  }
-
   private async lockCourt(client: PoolClient, tenantId: string, courtId: string): Promise<void> {
     await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`${tenantId}:${courtId}`]);
   }
