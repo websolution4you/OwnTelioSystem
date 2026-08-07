@@ -3,17 +3,31 @@ import Fastify from 'fastify';
 import { WebSocketServer } from 'ws';
 import { env } from './config/env.js';
 import { pool } from './db/pool.js';
+import { ProviderHealthService } from './health/ProviderHealthService.js';
 import { logger } from './shared/logger.js';
 import { registerTwilioRoutes } from './telephony/routes.js';
 import { VoiceCallSession } from './voice/VoiceCallSession.js';
 
 const app = Fastify({ logger: false, trustProxy: true });
 const websocketServer = new WebSocketServer({ noServer: true });
+const providerHealth = new ProviderHealthService({
+  sttProvider: env.STT_PROVIDER,
+  llmProvider: env.LLM_PROVIDER,
+  ttsProvider: env.TTS_PROVIDER,
+  ...(env.ELEVENLABS_API_KEY === undefined ? {} : { elevenLabsApiKey: env.ELEVENLABS_API_KEY }),
+  ...(env.ELEVENLABS_VOICE_ID === undefined ? {} : { elevenLabsVoiceId: env.ELEVENLABS_VOICE_ID }),
+  ...(env.OPENAI_API_KEY === undefined ? {} : { openAiApiKey: env.OPENAI_API_KEY }),
+  openAiModel: env.OPENAI_LLM_MODEL,
+});
 
 await app.register(formBody);
 await registerTwilioRoutes(app);
 
 app.get('/health/live', async () => ({ status: 'ok' }));
+app.get('/health/providers', async (_request, reply) => {
+  const result = await providerHealth.check();
+  return reply.status(result.status === 'ok' ? 200 : 503).send(result);
+});
 app.get('/health/ready', async (_request, reply) => {
   try {
     if (pool) await pool.query('SELECT 1');

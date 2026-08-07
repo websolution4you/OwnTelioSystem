@@ -13,7 +13,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "verify:scribe": "tsx src/scripts/verifyElevenLabsScribe.ts",
-    "verify:tts": "tsx src/scripts/verifyElevenLabsTts.ts"
+    "verify:tts": "tsx src/scripts/verifyElevenLabsTts.ts",
+    "verify:tts-barge-in": "tsx src/scripts/verifyTtsBargeIn.ts"
   },
   "dependencies": {
     "@fastify/formbody": "^8.0.2",

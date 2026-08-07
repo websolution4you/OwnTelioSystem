@@ -4,6 +4,7 @@ import type { AudioFrame, TtsProvider } from '../../voice/contracts.js';
 
 export class ElevenLabsTtsProvider implements TtsProvider {
   async synthesize(options: Parameters<TtsProvider['synthesize']>[0]): Promise<void> {
+    if (options.signal.aborted) return;
     if (!env.ELEVENLABS_API_KEY || !env.ELEVENLABS_VOICE_ID) {
       throw new Error('ELEVENLABS_API_KEY and ELEVENLABS_VOICE_ID are required');
     }
@@ -37,6 +38,10 @@ export class ElevenLabsTtsProvider implements TtsProvider {
       options.signal.addEventListener('abort', abort, { once: true });
 
       socket.on('open', () => {
+        if (options.signal.aborted) {
+          abort();
+          return;
+        }
         socket.send(JSON.stringify({
           text: ' ',
           voice_settings: {
