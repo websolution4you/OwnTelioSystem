@@ -3,6 +3,11 @@ import { requirePool } from '../../db/pool.js';
 import type { Booking, CreateBookingInput, Sport } from './types.js';
 import { sportCourtIds } from './types.js';
 
+interface CourtOccupancyRow {
+  court_id: string | null;
+  notes: string | Record<string, unknown> | null;
+}
+
 interface BookingRow {
   id: string;
   tenant_id: string;
@@ -17,7 +22,7 @@ interface BookingRow {
   notes: string | Record<string, unknown> | null;
 }
 
-function metadata(row: BookingRow): Record<string, unknown> {
+function metadata(row: { notes: string | Record<string, unknown> | null }): Record<string, unknown> {
   if (!row.notes) return {};
   if (typeof row.notes === 'object') return row.notes;
   try {
@@ -25,6 +30,10 @@ function metadata(row: BookingRow): Record<string, unknown> {
   } catch {
     return {};
   }
+}
+
+function courtId(row: CourtOccupancyRow): string {
+  return row.court_id ?? String(metadata(row).courtId ?? '');
 }
 
 function toBooking(row: BookingRow): Booking {
@@ -47,9 +56,8 @@ function toBooking(row: BookingRow): Booking {
 
 export class BookingRepository {
   async findFreeCourts(tenantId: string, sport: Sport, startAt: Date, endAt: Date): Promise<string[]> {
-    const result = await requirePool().query<BookingRow>(
-      `SELECT id, tenant_id, user_id, customer_name, customer_phone, sport, court_id,
-              start_at, end_at, status, notes
+    const result = await requirePool().query<CourtOccupancyRow>(
+      `SELECT court_id, notes
          FROM bookings
         WHERE tenant_id = $1
           AND status = ANY(ARRAY['confirmed', 'pending', 'blocked'])
@@ -57,7 +65,7 @@ export class BookingRepository {
           AND end_at > $2`,
       [tenantId, startAt.toISOString(), endAt.toISOString()],
     );
-    const busy = new Set(result.rows.map((row) => toBooking(row).courtId));
+    const busy = new Set(result.rows.map(courtId));
     return [...sportCourtIds[sport]].filter((courtId) => !busy.has(courtId));
   }
 
@@ -88,9 +96,8 @@ export class BookingRepository {
         return toBooking(existing);
       }
 
-      const conflicts = await client.query<BookingRow>(
-        `SELECT id, tenant_id, user_id, customer_name, customer_phone, sport, court_id,
-                start_at, end_at, status, notes
+      const conflicts = await client.query<CourtOccupancyRow>(
+        `SELECT court_id, notes
            FROM bookings
           WHERE tenant_id = $1
             AND status = ANY(ARRAY['confirmed', 'pending', 'blocked'])
@@ -98,7 +105,7 @@ export class BookingRepository {
             AND end_at > $2`,
         [input.tenantId, input.startAt.toISOString(), input.endAt.toISOString()],
       );
-      if (conflicts.rows.some((row) => toBooking(row).courtId === input.courtId)) {
+      if (conflicts.rows.some((row) => courtId(row) === input.courtId)) {
         throw new Error('BOOKING_CONFLICT');
       }
 
