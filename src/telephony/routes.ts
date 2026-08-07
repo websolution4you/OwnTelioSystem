@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import twilio from 'twilio';
 import { env } from '../config/env.js';
 import { logger } from '../shared/logger.js';
+import { createMediaAccessToken } from './mediaAuth.js';
 import { failureTwiml, mediaStreamTwiml } from './twiml.js';
 
 function publicRequestUrl(request: FastifyRequest): string {
@@ -37,12 +38,21 @@ export async function registerTwilioRoutes(app: FastifyInstance): Promise<void> 
       return reply.status(400).send(failureTwiml());
     }
     const websocketBase = env.PUBLIC_BASE_URL.replace(/^http/, 'ws').replace(/\/$/, '');
-    return reply.send(mediaStreamTwiml(`${websocketBase}/twilio/media/${callSid}`));
+    const authToken = env.TWILIO_AUTH_TOKEN;
+    if (!authToken) return reply.status(503).send(failureTwiml());
+    const mediaAccess = createMediaAccessToken(callSid, authToken);
+    const mediaUrl = `${websocketBase}/twilio/media/${callSid}/${mediaAccess.expiresAt}/${mediaAccess.token}`;
+    return reply.send(mediaStreamTwiml(mediaUrl));
   });
 
   app.post('/twilio/status', async (request, reply) => {
     if (!hasValidTwilioSignature(request)) return reply.status(403).send({ ok: false });
-    logger.info({ status: request.body }, 'Twilio status callback');
+    const body = (request.body ?? {}) as Record<string, string>;
+    logger.info({
+      callSid: body.CallSid,
+      callStatus: body.CallStatus,
+      sequenceNumber: body.SequenceNumber,
+    }, 'Twilio status callback');
     return reply.send({ ok: true });
   });
 }

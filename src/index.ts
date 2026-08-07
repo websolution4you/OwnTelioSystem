@@ -5,6 +5,7 @@ import { env } from './config/env.js';
 import { pool } from './db/pool.js';
 import { ProviderHealthService } from './health/ProviderHealthService.js';
 import { logger } from './shared/logger.js';
+import { validateMediaAccessToken } from './telephony/mediaAuth.js';
 import { registerTwilioRoutes } from './telephony/routes.js';
 import { VoiceCallSession } from './voice/VoiceCallSession.js';
 
@@ -38,12 +39,22 @@ app.get('/health/ready', async (_request, reply) => {
 });
 
 app.server.on('upgrade', (request, socket, head) => {
-  const match = request.url?.match(/^\/twilio\/media\/(CA[a-zA-Z0-9]+)(?:\?.*)?$/);
-  if (!match?.[1]) {
+  const requestUrl = new URL(request.url ?? '/', 'http://localhost');
+  const match = requestUrl.pathname.match(
+    /^\/twilio\/media\/(CA[a-zA-Z0-9]+)\/(\d{10})\/([a-zA-Z0-9_-]+)$/,
+  );
+  const callSid = match?.[1];
+  const authToken = env.TWILIO_AUTH_TOKEN;
+  if (!callSid || !authToken || !validateMediaAccessToken(
+    callSid,
+    match?.[2] ?? null,
+    match?.[3] ?? null,
+    authToken,
+  )) {
+    logger.warn({ callSid }, 'Rejected unauthorized Twilio media upgrade');
     socket.destroy();
     return;
   }
-  const callSid = match[1];
   websocketServer.handleUpgrade(request, socket, head, (websocket) => {
     const session = new VoiceCallSession(websocket, callSid);
     void session.start().catch((error) => {
