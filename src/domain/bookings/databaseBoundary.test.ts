@@ -22,6 +22,23 @@ const dryRunReadApi = readFileSync(
   new URL('../../../proposals/008_dry_run_restricted_booking_read_api.sql', import.meta.url),
   'utf8',
 );
+const disabledAppRole = readFileSync(
+  new URL('../../../proposals/011_create_disabled_app_role.sql', import.meta.url),
+  'utf8',
+);
+const verifyDisabledAppRole = readFileSync(
+  new URL('../../../proposals/012_verify_disabled_app_role.sql', import.meta.url),
+  'utf8',
+);
+const rollbackDisabledAppRole = readFileSync(
+  new URL('../../../proposals/013_rollback_disabled_app_role.sql', import.meta.url),
+  'utf8',
+);
+const dryRunDisabledAppRole = readFileSync(
+  new URL('../../../proposals/014_dry_run_disabled_app_role.sql', import.meta.url),
+  'utf8',
+);
+const pool = readFileSync(new URL('../../db/pool.ts', import.meta.url), 'utf8');
 
 describe('least-privilege booking database boundary', () => {
   it('allows the repository to call only the restricted booking API', () => {
@@ -67,6 +84,23 @@ describe('least-privilege booking database boundary', () => {
     }
     expect(rollbackReadApi).not.toMatch(/\bCASCADE\b/);
     expect(`${readApi}\n${dryRunReadApi}\n${verifyReadApi}`).not.toMatch(/(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+public\.bookings/i);
+  });
+
+  it('creates the application identity disabled, read-only and resource constrained', () => {
+    expect(disabledAppRole).toContain('CREATE ROLE own_telio_app');
+    expect(disabledAppRole).toContain('NOLOGIN');
+    expect(disabledAppRole).toContain('CONNECTION LIMIT 4');
+    expect(disabledAppRole).toContain('GRANT own_telio_runtime TO own_telio_app');
+    expect(disabledAppRole).toContain('default_transaction_read_only = on');
+    expect(disabledAppRole).not.toMatch(/\bPASSWORD\b/i);
+    expect(verifyDisabledAppRole).not.toMatch(/^\s*(?:INSERT|UPDATE|DELETE|CALL|PERFORM)\b/im);
+    expect(dryRunDisabledAppRole).toContain('ROLLBACK;');
+    expect(dryRunDisabledAppRole).not.toContain('COMMIT;');
+    expect(dryRunDisabledAppRole).toContain('app_role_still_exists');
+    expect(rollbackDisabledAppRole).not.toMatch(/\bCASCADE\b/);
+    expect(pool).toContain('max: 3');
+    expect(pool).toContain('query_timeout: 10_000');
+    expect(pool).toContain('statement_timeout: 8_000');
   });
 
   it('pins the production tenant and exact court inventory', () => {

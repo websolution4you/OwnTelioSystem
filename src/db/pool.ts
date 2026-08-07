@@ -4,7 +4,15 @@ import { env } from '../config/env.js';
 const { Pool } = pg;
 
 export const pool = env.DATABASE_URL
-  ? new Pool({ connectionString: env.DATABASE_URL, max: 10, idleTimeoutMillis: 30_000 })
+  ? new Pool({
+      connectionString: env.DATABASE_URL,
+      application_name: 'own-telio-voice',
+      max: 3,
+      connectionTimeoutMillis: 5_000,
+      idleTimeoutMillis: 30_000,
+      query_timeout: 10_000,
+      statement_timeout: 8_000,
+    })
   : null;
 
 export function requirePool(): pg.Pool {
