@@ -69,8 +69,25 @@ schema_access AS (
       SELECT rolname AS role_name
         FROM pg_roles
        WHERE rolname IN ('anon', 'authenticated', 'service_role', 'postgres')
-      UNION ALL SELECT 'PUBLIC'
     ) roles
+),
+public_schema_grants AS (
+  SELECT COALESCE(
+           jsonb_agg(
+             jsonb_build_object(
+               'grantee', 'PUBLIC',
+               'privilege', upper(acl.privilege_type),
+               'grantable', acl.is_grantable
+             ) ORDER BY acl.privilege_type
+           ),
+           '[]'::jsonb
+         ) AS grants
+    FROM pg_namespace namespace
+    CROSS JOIN LATERAL aclexplode(
+      COALESCE(namespace.nspacl, acldefault('n', namespace.nspowner))
+    ) acl
+   WHERE namespace.nspname = 'public'
+     AND acl.grantee = 0
 )
 SELECT jsonb_pretty(jsonb_build_object(
   'tables', (
@@ -88,5 +105,6 @@ SELECT jsonb_pretty(jsonb_build_object(
     LEFT JOIN policies p USING (table_schema, table_name)
   ),
   'role_memberships', COALESCE((SELECT memberships FROM role_memberships), '[]'::jsonb),
-  'schema_access', COALESCE((SELECT access FROM schema_access), '[]'::jsonb)
+  'schema_access', COALESCE((SELECT access FROM schema_access), '[]'::jsonb),
+  'public_schema_grants', COALESCE((SELECT grants FROM public_schema_grants), '[]'::jsonb)
 )) AS acl_audit;
