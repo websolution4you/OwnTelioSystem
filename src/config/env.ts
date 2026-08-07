@@ -43,7 +43,46 @@ const schema = z.object({
   ELEVENLABS_TTS_SPEED: z.coerce.number().min(0.7).max(1.2).default(0.84),
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_LLM_MODEL: z.string().default('gpt-4o-mini'),
+}).superRefine((value, context) => {
+  if (value.BOOKING_WRITES_ENABLED && !value.DATABASE_URL) {
+    context.addIssue({ code: 'custom', path: ['DATABASE_URL'], message: 'Required when booking writes are enabled' });
+  }
+  if (value.NODE_ENV !== 'production') return;
+
+  const required: Array<[keyof typeof value, unknown]> = [
+    ['PUBLIC_BASE_URL', value.PUBLIC_BASE_URL],
+    ['TWILIO_ACCOUNT_SID', value.TWILIO_ACCOUNT_SID],
+    ['TWILIO_AUTH_TOKEN', value.TWILIO_AUTH_TOKEN],
+    ['TWILIO_PHONE_NUMBER', value.TWILIO_PHONE_NUMBER],
+    ['DATABASE_URL', value.DATABASE_URL],
+    ['TELIO_TENANT_ID', value.TELIO_TENANT_ID],
+    ['ELEVENLABS_API_KEY', value.ELEVENLABS_API_KEY],
+    ['ELEVENLABS_VOICE_ID', value.ELEVENLABS_VOICE_ID],
+    ['OPENAI_API_KEY', value.OPENAI_API_KEY],
+  ];
+  for (const [path, configured] of required) {
+    if (!configured) context.addIssue({ code: 'custom', path: [path], message: 'Required in production' });
+  }
+  if (value.PUBLIC_BASE_URL && !value.PUBLIC_BASE_URL.startsWith('https://')) {
+    context.addIssue({ code: 'custom', path: ['PUBLIC_BASE_URL'], message: 'Must use HTTPS in production' });
+  }
+  if (!value.TWILIO_VALIDATE_SIGNATURES) {
+    context.addIssue({ code: 'custom', path: ['TWILIO_VALIDATE_SIGNATURES'], message: 'Must be enabled in production' });
+  }
+  if (value.STT_PROVIDER !== 'elevenlabs') {
+    context.addIssue({ code: 'custom', path: ['STT_PROVIDER'], message: 'Mock STT is forbidden in production' });
+  }
+  if (value.LLM_PROVIDER !== 'openai') {
+    context.addIssue({ code: 'custom', path: ['LLM_PROVIDER'], message: 'Mock LLM is forbidden in production' });
+  }
+  if (value.TTS_PROVIDER !== 'elevenlabs') {
+    context.addIssue({ code: 'custom', path: ['TTS_PROVIDER'], message: 'Mock TTS is forbidden in production' });
+  }
 });
 
-export const env = schema.parse(process.env);
+export function parseEnvironment(input: NodeJS.ProcessEnv): z.infer<typeof schema> {
+  return schema.parse(input);
+}
+
+export const env = parseEnvironment(process.env);
 export type Environment = z.infer<typeof schema>;
