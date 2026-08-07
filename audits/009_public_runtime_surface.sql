@@ -35,7 +35,10 @@ public_relations AS (
     CROSS JOIN LATERAL aclexplode(
       COALESCE(
         relation.relacl,
-        acldefault(CASE WHEN relation.relkind = 'S' THEN 'S'::char ELSE 'r'::char END, relation.relowner)
+        CASE
+          WHEN relation.relkind = 'S' THEN acldefault('S', relation.relowner)
+          ELSE acldefault('r', relation.relowner)
+        END
       )
     ) acl
    WHERE namespace.nspname NOT IN ('pg_catalog', 'information_schema')
