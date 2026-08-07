@@ -55,9 +55,15 @@ describe('least-privilege booking database boundary', () => {
     expect(dryRunReadApi).not.toContain('COMMIT;');
     expect(dryRunReadApi).toContain('schema_still_exists');
     expect(dryRunReadApi).toContain('role_still_exists');
-    expect(verifyReadApi).toContain('BEGIN TRANSACTION READ ONLY;');
+    for (const transactionalTest of [dryRunReadApi, verifyReadApi]) {
+      expect(transactionalTest).toContain('GRANT own_telio_runtime TO postgres;');
+      expect(transactionalTest).toContain('RESET ROLE;');
+      expect(transactionalTest).toContain('REVOKE own_telio_runtime FROM postgres;');
+      expect(transactionalTest).toContain('ROLLBACK;');
+      expect(transactionalTest).not.toContain('COMMIT;');
+    }
     expect(rollbackReadApi).not.toMatch(/\bCASCADE\b/);
-    expect(`${readApi}\n${dryRunReadApi}`).not.toMatch(/(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+public\.bookings/i);
+    expect(`${readApi}\n${dryRunReadApi}\n${verifyReadApi}`).not.toMatch(/(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+public\.bookings/i);
   });
 
   it('pins the production tenant and exact court inventory', () => {

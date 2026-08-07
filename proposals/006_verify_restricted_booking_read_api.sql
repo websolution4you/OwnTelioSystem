@@ -1,6 +1,7 @@
 -- Run only after 003a_restricted_booking_read_api.sql succeeds.
 -- Verifies grants and executes only the anonymous occupied-court read function.
-BEGIN TRANSACTION READ ONLY;
+-- Temporary role membership is fully rolled back; no booking data is modified.
+BEGIN;
 
 DO $verify$
 DECLARE
@@ -52,6 +53,7 @@ BEGIN
 END
 $verify$;
 
+GRANT own_telio_runtime TO postgres;
 SET LOCAL ROLE own_telio_runtime;
 
 SELECT court_id
@@ -62,4 +64,6 @@ SELECT court_id
   )
  ORDER BY court_id;
 
+RESET ROLE;
+REVOKE own_telio_runtime FROM postgres;
 ROLLBACK;

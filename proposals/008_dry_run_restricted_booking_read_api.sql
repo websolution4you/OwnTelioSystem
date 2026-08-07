@@ -59,6 +59,9 @@ REVOKE ALL ON FUNCTION telio_voice.occupied_courts(uuid, timestamptz, timestampt
 GRANT USAGE ON SCHEMA telio_voice TO own_telio_runtime;
 GRANT EXECUTE ON FUNCTION telio_voice.occupied_courts(uuid, timestamptz, timestamptz) TO own_telio_runtime;
 
+-- Supabase's postgres role is not a superuser and needs temporary membership for SET ROLE.
+-- The grant exists only inside this transaction and is removed before the final rollback.
+GRANT own_telio_runtime TO postgres;
 SET LOCAL ROLE own_telio_runtime;
 SELECT court_id
   FROM telio_voice.occupied_courts(
@@ -68,6 +71,7 @@ SELECT court_id
   )
  ORDER BY court_id;
 RESET ROLE;
+REVOKE own_telio_runtime FROM postgres;
 
 ROLLBACK;
 
