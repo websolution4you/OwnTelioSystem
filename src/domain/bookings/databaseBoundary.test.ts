@@ -14,8 +14,8 @@ const createApi = readFileSync(
 describe('least-privilege booking database boundary', () => {
   it('allows the repository to call only the restricted booking API', () => {
     expect(repository).toContain('telio_voice.occupied_courts');
-    expect(repository).toContain('telio_voice.find_upcoming_bookings');
     expect(repository).toContain('telio_voice.create_booking');
+    expect(repository).not.toContain('find_upcoming_bookings');
     expect(repository).not.toMatch(/\b(?:FROM|INTO|UPDATE|DELETE\s+FROM)\s+(?:public\.)?bookings\b/i);
     expect(repository).not.toContain('booking_users');
     expect(repository).not.toContain('user_id');
@@ -24,14 +24,14 @@ describe('least-privilege booking database boundary', () => {
 
   it('locks down security-definer functions and the runtime role', () => {
     const sql = `${readApi}\n${createApi}`;
-    expect(sql.match(/SECURITY DEFINER/g)).toHaveLength(3);
-    expect(sql.match(/SET search_path = pg_catalog/g)).toHaveLength(3);
-    expect(sql.match(/REVOKE ALL ON FUNCTION[\s\S]*?FROM PUBLIC;/g)).toHaveLength(3);
+    expect(sql.match(/SECURITY DEFINER/g)).toHaveLength(2);
+    expect(sql.match(/SET search_path = pg_catalog/g)).toHaveLength(2);
+    expect(sql.match(/REVOKE ALL ON FUNCTION[\s\S]*?FROM PUBLIC;/g)).toHaveLength(2);
     expect(readApi).toContain('CREATE ROLE own_telio_runtime NOLOGIN');
     expect(readApi).toContain('REVOKE ALL ON ALL TABLES IN SCHEMA public FROM own_telio_runtime');
-    expect(sql).not.toMatch(/CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+[^\s(]*(?:cancel|delete|update|restore)/i);
+    expect(sql).not.toMatch(/CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+[^\s(]*(?:find|list|cancel|delete|update|restore)/i);
     const returnSignatures = sql.match(/RETURNS TABLE\([\s\S]*?\)/g) ?? [];
-    expect(returnSignatures).toHaveLength(3);
+    expect(returnSignatures).toHaveLength(2);
     expect(returnSignatures.join('\n')).not.toMatch(/\b(?:user_id|notes)\b/);
   });
 

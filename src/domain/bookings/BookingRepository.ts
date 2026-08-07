@@ -59,12 +59,4 @@ export class BookingRepository {
     if (!booking) throw new Error('BOOKING_CREATE_EMPTY_RESULT');
     return toBooking(booking);
   }
-
-  async findUpcomingByPhone(tenantId: string, phone: string): Promise<Booking[]> {
-    const result = await requirePool().query<BookingRow>(
-      'SELECT * FROM telio_voice.find_upcoming_bookings($1, $2)',
-      [tenantId, phone],
-    );
-    return result.rows.map(toBooking);
-  }
 }

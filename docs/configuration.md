@@ -24,7 +24,7 @@ Create a local `.env` file. Never commit it.
 - `TELIO_TENANT_ID`: tenant UUID used by the Telio booking calendar
 - `TELIO_TIME_ZONE=Europe/Bratislava`
 
-The assistant can read booking availability, find upcoming bookings and insert a new confirmed booking after explicit confirmation. It has no cancel, delete, restore or update tool. Run `npm run audit:db-schema` before enabling writes; the command forces a read-only transaction and inspects metadata and privileges without reading booking rows. Do not apply draft migrations to the shared production database.
+The assistant can read anonymous court availability and insert a new confirmed booking after explicit confirmation. It cannot search personal bookings and has no cancel, delete, restore or update tool. Run `npm run audit:db-schema` before enabling writes; the command forces a read-only transaction and inspects metadata and privileges without reading booking rows. Do not apply draft migrations to the shared production database.
 
 ## Providers
 

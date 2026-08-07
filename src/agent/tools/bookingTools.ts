@@ -16,8 +16,6 @@ const createSchema = intervalSchema.extend({
   customerPhone: z.string().min(7).max(30),
   idempotencyKey: z.string().min(8).max(200),
 });
-const phoneSchema = z.object({ customerPhone: z.string().min(7).max(30) });
-
 export const bookingToolDefinitions: ToolDefinition[] = [
   {
     name: 'check_availability',
@@ -49,14 +47,6 @@ export const bookingToolDefinitions: ToolDefinition[] = [
       },
       required: ['sport', 'courtId', 'startAt', 'durationMinutes', 'customerName', 'customerPhone', 'idempotencyKey'],
       additionalProperties: false,
-    },
-  },
-  {
-    name: 'find_upcoming_bookings',
-    description: 'Find upcoming confirmed bookings by caller phone.',
-    inputSchema: {
-      type: 'object', properties: { customerPhone: { type: 'string' } },
-      required: ['customerPhone'], additionalProperties: false,
     },
   },
 ];
@@ -94,10 +84,6 @@ export class BookingToolExecutor {
         idempotencyKey: input.idempotencyKey,
       });
       return { created: true, booking };
-    }
-    if (name === 'find_upcoming_bookings') {
-      const input = phoneSchema.parse(rawInput);
-      return { bookings: await this.repository.findUpcomingByPhone(tenantId, input.customerPhone) };
     }
     throw new Error(`Unknown tool: ${name}`);
   }

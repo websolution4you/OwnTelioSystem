@@ -1,5 +1,5 @@
 -- REVIEW ONLY. Do not run yet.
--- Tenant-scoped read API for Own Telio. Reads no booking_users data.
+-- Tenant-scoped availability API for Own Telio. Returns court IDs only; no customer data.
 BEGIN;
 
 CREATE SCHEMA IF NOT EXISTS telio_voice;
@@ -49,49 +49,8 @@ BEGIN
 END
 $function$;
 
-CREATE OR REPLACE FUNCTION telio_voice.find_upcoming_bookings(
-  p_tenant_id uuid,
-  p_customer_phone text
-)
-RETURNS TABLE(
-  id uuid, tenant_id uuid, customer_name text, customer_phone text,
-  sport text, court_id text, start_at timestamptz, end_at timestamptz,
-  status text
-)
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-SET search_path = pg_catalog
-AS $function$
-BEGIN
-  IF p_tenant_id IS DISTINCT FROM '595cbb6c-1019-41ae-b1c2-a60c13c8dcdf'::uuid THEN
-    RAISE EXCEPTION 'TENANT_NOT_ALLOWED' USING ERRCODE = '42501';
-  END IF;
-  IF p_customer_phone IS NULL OR length(p_customer_phone) < 7
-     OR length(p_customer_phone) > 30 THEN
-    RAISE EXCEPTION 'INVALID_CUSTOMER_PHONE' USING ERRCODE = '22023';
-  END IF;
-
-  RETURN QUERY
-  SELECT booking.id, booking.tenant_id, booking.customer_name,
-         booking.customer_phone, booking.sport,
-         COALESCE(booking.court_id,
-           substring(booking.notes FROM '"courtId"[[:space:]]*:[[:space:]]*"([^"]+)"')),
-         booking.start_at, booking.end_at, booking.status
-    FROM public.bookings booking
-   WHERE booking.tenant_id = p_tenant_id
-     AND booking.customer_phone = p_customer_phone
-     AND booking.status = 'confirmed'
-     AND booking.start_at > statement_timestamp()
-   ORDER BY booking.start_at ASC
-   LIMIT 10;
-END
-$function$;
-
 REVOKE ALL ON FUNCTION telio_voice.occupied_courts(uuid, timestamptz, timestamptz) FROM PUBLIC;
-REVOKE ALL ON FUNCTION telio_voice.find_upcoming_bookings(uuid, text) FROM PUBLIC;
 GRANT USAGE ON SCHEMA telio_voice TO own_telio_runtime;
 GRANT EXECUTE ON FUNCTION telio_voice.occupied_courts(uuid, timestamptz, timestamptz) TO own_telio_runtime;
-GRANT EXECUTE ON FUNCTION telio_voice.find_upcoming_bookings(uuid, text) TO own_telio_runtime;
 
 COMMIT;
