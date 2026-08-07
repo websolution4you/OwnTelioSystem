@@ -9,7 +9,6 @@ interface CourtOccupancyRow {
 interface BookingRow {
   id: string;
   tenant_id: string;
-  user_id: string | null;
   customer_name: string | null;
   customer_phone: string | null;
   sport: Sport | null;
@@ -17,34 +16,18 @@ interface BookingRow {
   start_at: string;
   end_at: string;
   status: 'confirmed' | 'pending' | 'blocked' | 'cancelled';
-  notes: string | Record<string, unknown> | null;
-}
-
-function metadata(row: { notes: string | Record<string, unknown> | null }): Record<string, unknown> {
-  if (!row.notes) return {};
-  if (typeof row.notes === 'object') return row.notes;
-  try {
-    return JSON.parse(row.notes) as Record<string, unknown>;
-  } catch {
-    return {};
-  }
 }
 
 function toBooking(row: BookingRow): Booking {
-  const notes = metadata(row);
   return {
     id: row.id,
     tenantId: row.tenant_id,
-    userId: row.user_id,
     customerName: row.customer_name ?? '',
     customerPhone: row.customer_phone,
-    courtId: row.court_id ?? String(notes.courtId ?? ''),
+    courtId: row.court_id ?? '',
     startAt: row.start_at,
     endAt: row.end_at,
     status: row.status,
-    source: notes.source === 'admin' || notes.source === 'web' || notes.source === 'own-telio-voice-assistant'
-      ? notes.source
-      : 'voice-assistant',
   };
 }
 

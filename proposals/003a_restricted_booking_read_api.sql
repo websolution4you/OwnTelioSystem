@@ -54,9 +54,9 @@ CREATE OR REPLACE FUNCTION telio_voice.find_upcoming_bookings(
   p_customer_phone text
 )
 RETURNS TABLE(
-  id uuid, tenant_id uuid, user_id uuid, customer_name text, customer_phone text,
+  id uuid, tenant_id uuid, customer_name text, customer_phone text,
   sport text, court_id text, start_at timestamptz, end_at timestamptz,
-  status text, notes text
+  status text
 )
 LANGUAGE plpgsql
 STABLE
@@ -73,11 +73,11 @@ BEGIN
   END IF;
 
   RETURN QUERY
-  SELECT booking.id, booking.tenant_id, booking.user_id, booking.customer_name,
+  SELECT booking.id, booking.tenant_id, booking.customer_name,
          booking.customer_phone, booking.sport,
          COALESCE(booking.court_id,
            substring(booking.notes FROM '"courtId"[[:space:]]*:[[:space:]]*"([^"]+)"')),
-         booking.start_at, booking.end_at, booking.status, booking.notes
+         booking.start_at, booking.end_at, booking.status
     FROM public.bookings booking
    WHERE booking.tenant_id = p_tenant_id
      AND booking.customer_phone = p_customer_phone

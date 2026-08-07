@@ -18,6 +18,8 @@ describe('least-privilege booking database boundary', () => {
     expect(repository).toContain('telio_voice.create_booking');
     expect(repository).not.toMatch(/\b(?:FROM|INTO|UPDATE|DELETE\s+FROM)\s+(?:public\.)?bookings\b/i);
     expect(repository).not.toContain('booking_users');
+    expect(repository).not.toContain('user_id');
+    expect(repository).not.toContain('notes');
   });
 
   it('locks down security-definer functions and the runtime role', () => {
@@ -28,6 +30,9 @@ describe('least-privilege booking database boundary', () => {
     expect(readApi).toContain('CREATE ROLE own_telio_runtime NOLOGIN');
     expect(readApi).toContain('REVOKE ALL ON ALL TABLES IN SCHEMA public FROM own_telio_runtime');
     expect(sql).not.toMatch(/CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+[^\s(]*(?:cancel|delete|update|restore)/i);
+    const returnSignatures = sql.match(/RETURNS TABLE\([\s\S]*?\)/g) ?? [];
+    expect(returnSignatures).toHaveLength(3);
+    expect(returnSignatures.join('\n')).not.toMatch(/\b(?:user_id|notes)\b/);
   });
 
   it('pins the production tenant and exact court inventory', () => {

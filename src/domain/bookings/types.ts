@@ -17,14 +17,12 @@ export const sportCourtCounts: Record<Sport, number> = {
 export interface Booking {
   id: string;
   tenantId: string;
-  userId: string | null;
   customerName: string;
   customerPhone: string | null;
   courtId: string;
   startAt: string;
   endAt: string;
   status: 'confirmed' | 'pending' | 'blocked' | 'cancelled';
-  source: 'own-telio-voice-assistant' | 'voice-assistant' | 'web' | 'admin';
 }
 
 export interface CreateBookingInput {

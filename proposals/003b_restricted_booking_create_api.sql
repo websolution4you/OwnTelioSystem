@@ -13,9 +13,9 @@ CREATE OR REPLACE FUNCTION telio_voice.create_booking(
   p_idempotency_key text
 )
 RETURNS TABLE(
-  id uuid, tenant_id uuid, user_id uuid, customer_name text, customer_phone text,
+  id uuid, tenant_id uuid, customer_name text, customer_phone text,
   sport text, court_id text, start_at timestamptz, end_at timestamptz,
-  status text, notes text
+  status text
 )
 LANGUAGE plpgsql
 VOLATILE
@@ -68,9 +68,9 @@ BEGIN
   PERFORM pg_advisory_xact_lock(hashtext(p_tenant_id::text || ':' || p_court_id));
 
   RETURN QUERY
-  SELECT booking.id, booking.tenant_id, booking.user_id, booking.customer_name,
+  SELECT booking.id, booking.tenant_id, booking.customer_name,
          booking.customer_phone, booking.sport, booking.court_id,
-         booking.start_at, booking.end_at, booking.status, booking.notes
+         booking.start_at, booking.end_at, booking.status
     FROM public.bookings booking
    WHERE booking.tenant_id = p_tenant_id AND booking.notes = v_notes
    LIMIT 1;
@@ -96,9 +96,9 @@ BEGIN
     p_tenant_id, trim(p_customer_name), p_customer_phone, p_sport, p_court_id,
     p_start_at, p_end_at, 'confirmed', v_notes
   )
-  RETURNING bookings.id, bookings.tenant_id, bookings.user_id, bookings.customer_name,
+  RETURNING bookings.id, bookings.tenant_id, bookings.customer_name,
             bookings.customer_phone, bookings.sport, bookings.court_id,
-            bookings.start_at, bookings.end_at, bookings.status, bookings.notes;
+            bookings.start_at, bookings.end_at, bookings.status;
 END
 $function$;
 
